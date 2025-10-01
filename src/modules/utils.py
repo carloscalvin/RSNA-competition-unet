@@ -65,7 +65,7 @@ def save_weights(model, cfg, epoch=""):
         state_dict= model.state_dict()
 
     # Weights
-    fpath= "./data/checkpoints/{}_{}{}.pt".format(
+    fpath= "/content/data/checkpoints/{}_{}{}.pt".format(
         cfg.config_file, 
         cfg.seed, 
         epoch,
