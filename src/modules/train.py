@@ -82,7 +82,7 @@ def train(cfg):
                 logger.log(train_metrics, commit=False)
 
         eval_model = ema_model.module if ema_model else model
-        val_metrics = run_eval(eval_model, val_ds, val_dl, cfg)
+        val_metrics = run_eval(eval_model, val_df, val_dl, cfg)
         
         current_score = val_metrics['val']['score']
         print(f"Epoch {epoch}: Val Score: {current_score:.4f}, Val Loss: {val_metrics['val']['loss']:.4f}")

@@ -90,8 +90,15 @@ class CustomDataset(torch.utils.data.Dataset):
                           x_start : x_start + roi_w]
 
         img = img[np.newaxis, ...].astype(np.float32)
-        
-        return {
-            "input": torch.from_numpy(img),
-            "target": torch.from_numpy(label),
-        }
+
+        if self.mode == 'train':
+            return {
+                "input": torch.from_numpy(img),
+                "target": torch.from_numpy(label),
+            }
+        else:
+            return {
+                "series_uid": series_uid,
+                "input": torch.from_numpy(img),
+                "target": torch.from_numpy(label),
+            }

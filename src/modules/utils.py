@@ -1,5 +1,5 @@
 from monai.inferers import sliding_window_inference
-from src.modules.metric import score 
+from src.modules.metric import score, LABEL_COLS
 import pickle
 import torch
 import torch.nn as nn
@@ -13,7 +13,9 @@ def batch_to_device(batch, device):
     elif isinstance(batch, list):
         return [batch_to_device(val, device) for val in batch]
     else:
-        return batch.to(device)
+        if isinstance(batch, torch.Tensor):
+            return batch.to(device)
+        return batch
 
 def calc_grad_norm(parameters,norm_type=2.):
     if isinstance(parameters, torch.Tensor):
@@ -58,14 +60,14 @@ def flatten_dict(d):
     _flatten("", d, flattened_dict)
     return flattened_dict
 
-def run_eval(model, val_ds, val_dl, cfg):
+def run_eval(model, val_df, val_dl, cfg):
     model.eval()
-    
+
     progress_bar = tqdm(range(len(val_dl)), disable=cfg.local_rank != 0)
     val_itr = iter(val_dl)
     
     all_preds = []
-    all_labels = []
+    all_series_uids = []
     val_losses = []
 
     with torch.no_grad():
@@ -89,15 +91,13 @@ def run_eval(model, val_ds, val_dl, cfg):
             location_probs = torch.max(preds_probs.view(preds_probs.shape[0], 13, -1), dim=2).values
             present_prob = torch.max(location_probs, dim=1, keepdim=True).values
             final_probs = torch.cat([location_probs, present_prob], dim=1)
+            
             all_preds.append(final_probs.cpu().numpy())
-
-            true_locations = torch.max(batch["target"].view(batch["target"].shape[0], 13, -1), dim=2).values
-            true_presence = torch.max(true_locations, dim=1, keepdim=True).values
-            final_labels = torch.cat([true_locations, true_presence], dim=1)
-            all_labels.append(final_labels.cpu().numpy())
+            all_series_uids.extend(batch["series_uid"])
 
     y_pred = np.concatenate(all_preds)
-    y_true = np.concatenate(all_labels)
+    ordered_df = val_df[val_df['SeriesInstanceUID'].isin(all_series_uids)].set_index('SeriesInstanceUID').loc[all_series_uids].reset_index()
+    y_true = ordered_df[LABEL_COLS].values
 
     val_metrics = score(y_true, y_pred)
     val_metrics['loss'] = np.mean(val_losses)

@@ -7,7 +7,6 @@ import torch
 from src.data.utils import get_dataset, get_dataloader
 from src.models.utils import get_model
 from src.modules.utils import run_eval
-from src.data._3d import CustomDataset
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a trained model checkpoint.")
@@ -30,7 +29,7 @@ def main():
     model, _ = get_model(cfg, inference_mode=True)
     model.to(cfg.device)
 
-    metrics = run_eval(model, eval_ds, eval_dl, cfg)
+    metrics = run_eval(model, eval_df, eval_dl, cfg)
 
     val_metrics = metrics['val']
     score = val_metrics['score']
