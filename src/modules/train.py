@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import torch
 from tqdm import tqdm
 from sklearn.model_selection import GroupKFold
 from torch.amp import autocast, GradScaler
@@ -59,10 +60,13 @@ def train(cfg):
             
             if scaler:
                 scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 scaler.step(optimizer)
                 scaler.update()
             else:
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
             
             optimizer.zero_grad()
@@ -81,17 +85,18 @@ def train(cfg):
                 progress_bar.set_postfix(flatten_dict(train_metrics))
                 logger.log(train_metrics, commit=False)
 
-        eval_model = ema_model.module if ema_model else model
-        val_metrics = run_eval(eval_model, val_df, val_dl, cfg)
-        
-        current_score = val_metrics['val']['score']
-        print(f"Epoch {epoch}: Val Score: {current_score:.4f}, Val Loss: {val_metrics['val']['loss']:.4f}")
-        logger.log(val_metrics, commit=True)
-        
-        if current_score > best_score:
-            print(f"Score improved: {best_score:.4f} -> {current_score:.4f}. Saving model...")
-            best_score = current_score
-            save_weights(eval_model, cfg, epoch=f"{epoch}_score{current_score:.4f}")
+        if (epoch + 1) % cfg.eval_epochs == 0:
+            eval_model = ema_model.module if ema_model else model
+            val_metrics = run_eval(eval_model, val_df, val_dl, cfg)
+
+            current_score = val_metrics['val']['score']
+            print(f"Epoch {epoch}: Val Score: {current_score:.4f}, Val Loss: {val_metrics['val']['loss']:.4f}")
+            logger.log(val_metrics, commit=True)
+            
+            if current_score > best_score:
+                print(f"Score improved: {best_score:.4f} -> {current_score:.4f}. Saving model...")
+                best_score = current_score
+                save_weights(eval_model, cfg, epoch=f"{epoch}_score{current_score:.4f}")
 
     logger.finish()
     return

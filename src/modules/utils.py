@@ -114,7 +114,7 @@ def save_weights(model, cfg, epoch=""):
         state_dict= model.state_dict()
 
     # Weights
-    fpath= "/content/data/checkpoints/{}_{}{}.pt".format(
+    fpath= "/content/drive/MyDrive/RSNA/models/RSNA-competition-unet/fold0/{}_{}{}.pt".format(
         cfg.config_file, 
         cfg.seed, 
         epoch,

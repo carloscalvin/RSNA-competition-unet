@@ -1,12 +1,14 @@
 from ._base import cfg
 from types import SimpleNamespace
 
-# Optimizer + Scheduler
-cfg.epochs= 100
+# General
+cfg.fold= 0
+cfg.epochs= 200
+cfg.eval_epochs= 5
 
 # Dataloader
 cfg.batch_size= 32
-cfg.num_workers= 6
+cfg.num_workers= 4
 
 # Dataset
 cfg.dataset_type= "_3d"
