@@ -2,65 +2,15 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from sklearn.model_selection import GroupKFold
-
-import torch
 from torch.amp import autocast, GradScaler
-from monai.inferers import sliding_window_inference
 
 from src.data.utils import get_dataset, get_dataloader
 from src.models.utils import get_model, ModelEMA
 from src.modules.utils import (
     get_optimizer, get_scheduler, batch_to_device,
-    flatten_dict, save_weights
+    flatten_dict, save_weights, run_eval
 )
 from src.logging.utils import get_logger
-from src.modules.metric import score, LABEL_COLS 
-
-def run_eval(model, val_ds, val_dl, cfg):
-    model.eval()
-    
-    progress_bar = tqdm(range(len(val_dl)), disable=cfg.local_rank != 0)
-    val_itr = iter(val_dl)
-    
-    all_preds = []
-    all_labels = []
-    val_losses = []
-
-    with torch.no_grad():
-        for i in progress_bar:
-            batch = next(val_itr)
-            batch = batch_to_device(batch, cfg.device)
-            
-            with autocast(cfg.device.type):
-                preds_map = sliding_window_inference(
-                    inputs=batch["input"].float(),
-                    roi_size=cfg.roi_size,
-                    predictor=model,
-                    overlap=0.5,
-                    sw_batch_size=4,
-                )
-
-                loss = model.loss_fn(preds_map, batch["target"].float()).item()
-                val_losses.append(loss)
-
-            preds_probs = torch.sigmoid(preds_map)
-            location_probs = torch.max(preds_probs.view(preds_probs.shape[0], 13, -1), dim=2).values
-            present_prob = torch.max(location_probs, dim=1, keepdim=True).values
-            final_probs = torch.cat([location_probs, present_prob], dim=1)
-            all_preds.append(final_probs.cpu().numpy())
-
-            true_locations = torch.max(batch["target"].view(batch["target"].shape[0], 13, -1), dim=2).values
-            true_presence = torch.max(true_locations, dim=1, keepdim=True).values
-            final_labels = torch.cat([true_locations, true_presence], dim=1)
-            all_labels.append(final_labels.cpu().numpy())
-
-    y_pred = np.concatenate(all_preds)
-    y_true = np.concatenate(all_labels)
-
-    val_metrics = score(y_true, y_pred)
-    val_metrics['loss'] = np.mean(val_losses)
-    
-    return {"val": val_metrics}
 
 def train(cfg):
     logger = get_logger(cfg)

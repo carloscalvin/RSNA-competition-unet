@@ -1,8 +1,11 @@
-from copy import deepcopy
+from monai.inferers import sliding_window_inference
+from src.modules.metric import score 
 import pickle
-
 import torch
 import torch.nn as nn
+import numpy as np
+from tqdm import tqdm
+from torch.amp import autocast
 
 def batch_to_device(batch, device):
     if isinstance(batch, dict):
@@ -54,6 +57,52 @@ def flatten_dict(d):
     flattened_dict = {}
     _flatten("", d, flattened_dict)
     return flattened_dict
+
+def run_eval(model, val_ds, val_dl, cfg):
+    model.eval()
+    
+    progress_bar = tqdm(range(len(val_dl)), disable=cfg.local_rank != 0)
+    val_itr = iter(val_dl)
+    
+    all_preds = []
+    all_labels = []
+    val_losses = []
+
+    with torch.no_grad():
+        for i in progress_bar:
+            batch = next(val_itr)
+            batch = batch_to_device(batch, cfg.device)
+            
+            with autocast(cfg.device.type):
+                preds_map = sliding_window_inference(
+                    inputs=batch["input"].float(),
+                    roi_size=cfg.roi_size,
+                    predictor=model,
+                    overlap=0.5,
+                    sw_batch_size=4,
+                )
+
+                #loss = model.loss_fn(preds_map, batch["target"].float()).item()
+                #val_losses.append(loss)
+
+            preds_probs = torch.sigmoid(preds_map)
+            location_probs = torch.max(preds_probs.view(preds_probs.shape[0], 13, -1), dim=2).values
+            present_prob = torch.max(location_probs, dim=1, keepdim=True).values
+            final_probs = torch.cat([location_probs, present_prob], dim=1)
+            all_preds.append(final_probs.cpu().numpy())
+
+            true_locations = torch.max(batch["target"].view(batch["target"].shape[0], 13, -1), dim=2).values
+            true_presence = torch.max(true_locations, dim=1, keepdim=True).values
+            final_labels = torch.cat([true_locations, true_presence], dim=1)
+            all_labels.append(final_labels.cpu().numpy())
+
+    y_pred = np.concatenate(all_preds)
+    y_true = np.concatenate(all_labels)
+
+    val_metrics = score(y_true, y_pred)
+    val_metrics['loss'] = np.mean(val_losses)
+    
+    return {"val": val_metrics}
 
 def save_weights(model, cfg, epoch=""):
     if epoch != "":
