@@ -1,11 +1,12 @@
 from monai.inferers import sliding_window_inference
-from src.modules.metric import score, LABEL_COLS
+from src.modules.metric import score, CSV_LOCATION_COLS, HEATMAP_LOCATION_COLS
 import pickle
 import torch
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from torch.amp import autocast
+import pandas as pd
 
 def batch_to_device(batch, device):
     if isinstance(batch, dict):
@@ -97,7 +98,12 @@ def run_eval(model, val_df, val_dl, cfg):
 
     y_pred = np.concatenate(all_preds)
     ordered_df = val_df[val_df['SeriesInstanceUID'].isin(all_series_uids)].set_index('SeriesInstanceUID').loc[all_series_uids].reset_index()
-    y_true = ordered_df[LABEL_COLS].values
+    csv_cols_full = CSV_LOCATION_COLS + ['Aneurysm Present']
+    y_true_csv_order = ordered_df[csv_cols_full].values
+    y_true_df = pd.DataFrame(y_true_csv_order, columns=csv_cols_full)
+    heatmap_cols_full = HEATMAP_LOCATION_COLS + ['Aneurysm Present']
+    y_true_reordered_df = y_true_df[heatmap_cols_full]
+    y_true = y_true_reordered_df.values
 
     val_metrics = score(y_true, y_pred)
     val_metrics['loss'] = np.mean(val_losses)

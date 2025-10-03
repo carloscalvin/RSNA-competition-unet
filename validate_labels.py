@@ -7,7 +7,7 @@ import torch
 from tqdm import tqdm
 
 from src.data.utils import get_dataset, get_dataloader
-from src.modules.metric import score, LABEL_COLS
+from src.modules.metric import score, CSV_LOCATION_COLS, HEATMAP_LOCATION_COLS
 from src.modules.utils import batch_to_device
 
 def validate_perfect_maps_auc(val_dl, val_df, cfg):
@@ -31,7 +31,12 @@ def validate_perfect_maps_auc(val_dl, val_df, cfg):
 
     y_pred = np.concatenate(all_pseudo_preds)
     ordered_df = val_df[val_df['SeriesInstanceUID'].isin(all_series_uids)].set_index('SeriesInstanceUID').loc[all_series_uids].reset_index()
-    y_true = ordered_df[LABEL_COLS].values
+    csv_cols_full = CSV_LOCATION_COLS + ['Aneurysm Present']
+    y_true_csv_order = ordered_df[csv_cols_full].values
+    y_true_df = pd.DataFrame(y_true_csv_order, columns=csv_cols_full)
+    heatmap_cols_full = HEATMAP_LOCATION_COLS + ['Aneurysm Present']
+    y_true_reordered_df = y_true_df[heatmap_cols_full]
+    y_true = y_true_reordered_df.values
 
     metrics = score(y_true, y_pred)
     

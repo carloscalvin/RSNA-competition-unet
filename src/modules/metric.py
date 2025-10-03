@@ -1,19 +1,22 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
-LABEL_COLS = [
+CSV_LOCATION_COLS = [
     'Left Infraclinoid Internal Carotid Artery', 'Right Infraclinoid Internal Carotid Artery',
     'Left Supraclinoid Internal Carotid Artery', 'Right Supraclinoid Internal Carotid Artery',
     'Left Middle Cerebral Artery', 'Right Middle Cerebral Artery', 'Anterior Communicating Artery',
     'Left Anterior Cerebral Artery', 'Right Anterior Cerebral Artery', 'Left Posterior Communicating Artery',
-    'Right Posterior Communicating Artery', 'Basilar Tip', 'Other Posterior Circulation', 
-    'Aneurysm Present'
+    'Right Posterior Communicating Artery', 'Basilar Tip', 'Other Posterior Circulation'
 ]
+
+HEATMAP_LOCATION_COLS = sorted(CSV_LOCATION_COLS)
+
+_SCORE_COLS = HEATMAP_LOCATION_COLS + ['Aneurysm Present']
 
 def score(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     scores = {}
 
-    for i, col_name in enumerate(LABEL_COLS):
+    for i, col_name in enumerate(_SCORE_COLS):
         try:
             col_true = y_true[:, i]
             col_pred = y_pred[:, i]
@@ -26,7 +29,7 @@ def score(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
             scores[col_name] = 0.5
 
     auc_present = scores['Aneurysm Present']    
-    location_aucs = [scores[col] for col in LABEL_COLS if col != 'Aneurysm Present']
+    location_aucs = [scores[col] for col in _SCORE_COLS if col != 'Aneurysm Present']
     mean_location_auc = np.mean(location_aucs)
 
     final_score = 0.5 * auc_present + 0.5 * mean_location_auc
