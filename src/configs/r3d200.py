@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 # General
 cfg.fold= 0
-cfg.epochs= 200
+cfg.epochs= 300
 cfg.eval_epochs= 5
 
 # Dataloader
