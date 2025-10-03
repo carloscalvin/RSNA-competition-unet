@@ -7,11 +7,11 @@ cfg.num_workers= 0
 cfg.pin_memory = False
 
 # Dataset
-cfg.eval_csv_path = "dataset/preprocessed_3d_64_384_384/holdout_preliminar.csv" 
+cfg.eval_csv_path = "dataset/preprocessed_3d_64_384_384/replicated_holdout_fold0.csv" 
 cfg.image_dir = "dataset/preprocessed_3d_64_384_384/volumes/"
 cfg.coords_dir = "dataset/coords_metadata/"
 cfg.dataset_type = "_3d"
-cfg.weights_path = "dataset/checkpoints/r3d200_812671_epoch95_score0.7436.pt"
+cfg.weights_path = "dataset/checkpoints/r3d200_569188_epoch144_score0.7690.pt"
 
 # Model
 cfg.model_type = "unet3d"
