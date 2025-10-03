@@ -8,6 +8,8 @@ from tqdm import tqdm
 from torch.amp import autocast
 import pandas as pd
 
+from src.utils.torch import nms_3d
+
 def batch_to_device(batch, device):
     if isinstance(batch, dict):
         return {key: batch_to_device(val, device) for key, val in batch.items()}
@@ -61,6 +63,25 @@ def flatten_dict(d):
     _flatten("", d, flattened_dict)
     return flattened_dict
 
+
+
+def get_probs_from_heatmap_advanced(heatmap_batch: torch.Tensor, nms_radius: int):
+    probs_map = torch.sigmoid(heatmap_batch)
+    batch_size, num_channels, _, _, _ = probs_map.shape
+    all_location_probs = torch.zeros((batch_size, num_channels), device=probs_map.device)
+    
+    for b in range(batch_size):
+        for c in range(num_channels):
+            channel_map = probs_map[b, c, :, :, :]
+            peaks_map = nms_3d(channel_map.unsqueeze(0).unsqueeze(0), nms_radius=nms_radius)
+            max_peak_value = torch.max(peaks_map)
+            all_location_probs[b, c] = max_peak_value
+            
+    present_prob = torch.max(all_location_probs, dim=1, keepdim=True).values
+    final_probs = torch.cat([all_location_probs, present_prob], dim=1)
+    
+    return final_probs
+
 def run_eval(model, val_df, val_dl, cfg):
     model.eval()
 
@@ -84,15 +105,9 @@ def run_eval(model, val_df, val_dl, cfg):
                     overlap=0.5,
                     sw_batch_size=4,
                 )
-
-                #loss = model.loss_fn(preds_map, batch["target"].float()).item()
-                #val_losses.append(loss)
-
-            preds_probs = torch.sigmoid(preds_map)
-            location_probs = torch.max(preds_probs.view(preds_probs.shape[0], 13, -1), dim=2).values
-            present_prob = torch.max(location_probs, dim=1, keepdim=True).values
-            final_probs = torch.cat([location_probs, present_prob], dim=1)
             
+            nms_radius = 3
+            final_probs = get_probs_from_heatmap_advanced(preds_map, nms_radius)
             all_preds.append(final_probs.cpu().numpy())
             all_series_uids.extend(batch["series_uid"])
 
