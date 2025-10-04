@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 import torch
+import scipy
 
 def _compute_gaussian_kernel_3d(kernel_size, sigma):
     center = kernel_size // 2
@@ -88,6 +89,46 @@ class CustomDataset(torch.utils.data.Dataset):
                           z_start : z_start + roi_d,
                           y_start : y_start + roi_h,
                           x_start : x_start + roi_w]
+
+            z,y,x= self.cfg.roi_size
+
+            # Random rescale
+            if np.random.random() < self.cfg.rescale_p:
+                scales = np.random.uniform(low=0.5, high=1.3, size=3)
+
+                img= scipy.ndimage.zoom(img, scales, order=0)
+                label= scipy.ndimage.zoom(label, scales, order=0)
+
+            # Crop (to get back to roi_size)
+            lz,ly,lx= label.shape
+            z_start= np.random.randint(0, max(lz - z, 1))
+            y_start= np.random.randint(0, max(ly - y, 1))
+            x_start= np.random.randint(0, max(lx - x, 1))
+            z_end= z_start + z
+            y_end= y_start + y
+            x_end= x_start + x
+            img= img[z_start:z_end, y_start:y_end, x_start:x_end]
+            label= label[z_start:z_end, y_start:y_end, x_start:x_end]
+
+            # Pad (to get back to roi_size)
+            lz,ly,lx= label.shape
+            pad_z = max(z - lz, 0)
+            pad_y = max(y - ly, 0)
+            pad_x = max(x - lx, 0)
+            pad_zl= np.random.randint(0, pad_z + 1)
+            pad_zr= pad_z - pad_zl
+            pad_yl= np.random.randint(0, pad_y + 1)
+            pad_yr= pad_y - pad_yl
+            pad_xl= np.random.randint(0, pad_x + 1)
+            pad_xr= pad_x - pad_xl
+
+            pad_width= [(pad_zl, pad_zr), (pad_yl, pad_yr), (pad_xl, pad_xr)]
+            label= np.pad(label, pad_width, constant_values=0)
+            img= np.pad(img, pad_width, constant_values=np.random.randint(0, 255))
+
+            # Color inversion
+            if np.random.random() < 0.25:
+                img= 255 - img
 
         img = img[np.newaxis, ...].astype(np.float32)
 
