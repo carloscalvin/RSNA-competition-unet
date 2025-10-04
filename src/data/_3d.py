@@ -76,55 +76,62 @@ class CustomDataset(torch.utils.data.Dataset):
         if self.mode == "train":
             D, H, W = img.shape
             roi_d, roi_h, roi_w = self.cfg.roi_size
-
             z_start = np.random.randint(0, D - roi_d + 1)
             y_start = np.random.randint(0, H - roi_h + 1)
             x_start = np.random.randint(0, W - roi_w + 1)
-
-            img = img[z_start : z_start + roi_d,
-                      y_start : y_start + roi_h,
-                      x_start : x_start + roi_w]
             
-            label = label[:,
-                          z_start : z_start + roi_d,
-                          y_start : y_start + roi_h,
-                          x_start : x_start + roi_w]
+            img = img[z_start : z_start + roi_d, y_start : y_start + roi_h, x_start : x_start + roi_w]
+            label = label[:, z_start : z_start + roi_d, y_start : y_start + roi_h, x_start : x_start + roi_w]
 
-            z,y,x= self.cfg.roi_size
-
-            # Random rescale
+            # Random Rescale
             if np.random.random() < self.cfg.rescale_p:
-                scales = np.random.uniform(low=0.5, high=1.3, size=3)
+                scales = np.random.uniform(low=0.7, high=1.3, size=3)
+                img = scipy.ndimage.zoom(img, scales, order=1)
+                label_scales = (1, *scales)
+                label = scipy.ndimage.zoom(label, label_scales, order=0)
 
-                img= scipy.ndimage.zoom(img, scales, order=0)
-                label= scipy.ndimage.zoom(label, scales, order=0)
+            # Color Inversion
+            if np.random.random() < 0.25:
+                img = 255 - img
 
-            # Crop (to get back to roi_size)
-            lz,ly,lx= label.shape
-            z_start= np.random.randint(0, max(lz - z, 1))
-            y_start= np.random.randint(0, max(ly - y, 1))
-            x_start= np.random.randint(0, max(lx - x, 1))
-            z_end= z_start + z
-            y_end= y_start + y
-            x_end= x_start + x
-            img= img[z_start:z_end, y_start:y_end, x_start:x_end]
-            label= label[z_start:z_end, y_start:y_end, x_start:x_end]
+            min_d = min(img.shape[0], label.shape[1])
+            min_h = min(img.shape[1], label.shape[2])
+            min_w = min(img.shape[2], label.shape[3])
+            img = img[:min_d, :min_h, :min_w]
+            label = label[:, :min_d, :min_h, :min_w]
 
-            # Pad (to get back to roi_size)
-            lz,ly,lx= label.shape
-            pad_z = max(z - lz, 0)
-            pad_y = max(y - ly, 0)
-            pad_x = max(x - lx, 0)
-            pad_zl= np.random.randint(0, pad_z + 1)
-            pad_zr= pad_z - pad_zl
-            pad_yl= np.random.randint(0, pad_y + 1)
-            pad_yr= pad_y - pad_yl
-            pad_xl= np.random.randint(0, pad_x + 1)
-            pad_xr= pad_x - pad_xl
+            current_shape = img.shape
+            if current_shape[0] > roi_d:
+                start_d = np.random.randint(0, current_shape[0] - roi_d + 1)
+                img = img[start_d : start_d + roi_d, :, :]
+                label = label[:, start_d : start_d + roi_d, :, :]
+            if current_shape[1] > roi_h:
+                start_h = np.random.randint(0, current_shape[1] - roi_h + 1)
+                img = img[:, start_h : start_h + roi_h, :]
+                label = label[:, :, start_h : start_h + roi_h, :]
+            if current_shape[2] > roi_w:
+                start_w = np.random.randint(0, current_shape[2] - roi_w + 1)
+                img = img[:, :, start_w : start_w + roi_w]
+                label = label[:, :, :, start_w : start_w + roi_w]
 
-            pad_width= [(pad_zl, pad_zr), (pad_yl, pad_yr), (pad_xl, pad_xr)]
-            label= np.pad(label, pad_width, constant_values=0)
-            img= np.pad(img, pad_width, constant_values=np.random.randint(0, 255))
+            pad_d = max(0, roi_d - img.shape[0])
+            pad_h = max(0, roi_h - img.shape[1])
+            pad_w = max(0, roi_w - img.shape[2])
+            
+            if pad_d > 0 or pad_h > 0 or pad_w > 0:
+                pad_d_before = np.random.randint(0, pad_d + 1)
+                pad_h_before = np.random.randint(0, pad_h + 1)
+                pad_w_before = np.random.randint(0, pad_w + 1)
+
+                spatial_pad_width = [
+                    (pad_d_before, pad_d - pad_d_before),
+                    (pad_h_before, pad_h - pad_h_before),
+                    (pad_w_before, pad_w - pad_w_before)
+                ]
+                
+                img = np.pad(img, spatial_pad_width, mode='constant', constant_values=np.random.randint(0, 255))
+                label_pad_width = [(0, 0)] + spatial_pad_width
+                label = np.pad(label, label_pad_width, mode='constant', constant_values=0)
 
             # Color inversion
             if np.random.random() < 0.25:

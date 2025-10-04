@@ -94,9 +94,10 @@ def train(cfg):
             logger.log(val_metrics, commit=True)
             
             if current_score > best_score:
-                print(f"Score improved: {best_score:.4f} -> {current_score:.4f}. Saving model...")
+                print(f"Score improved: {best_score:.4f} -> {current_score:.4f}.")
                 best_score = current_score
-                save_weights(eval_model, cfg, epoch=f"{epoch}_score{current_score:.4f}")
+            print("Saving model...")
+            save_weights(eval_model, cfg, epoch=f"{epoch}_score{current_score:.4f}")
 
     logger.finish()
     return
