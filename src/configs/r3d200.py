@@ -5,6 +5,9 @@ from types import SimpleNamespace
 cfg.fold= 0
 cfg.epochs= 300
 cfg.eval_epochs= 5
+cfg.resume_from_checkpoint = "/content/drive/MyDrive/RSNA/models/RSNA-competition-unet/fold0/r3d200_970990_epoch214_score0.7416.pt"
+cfg.resume_epoch = 215
+cfg.resume_best_score = 0.7416
 
 # Dataloader
 cfg.batch_size= 32

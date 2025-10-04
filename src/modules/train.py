@@ -45,8 +45,28 @@ def train(cfg):
     scaler = GradScaler() if cfg.mixed_precision else None
     ema_model = ModelEMA(model, decay=cfg.ema_decay) if cfg.ema else None
 
+    start_epoch = 0
+    if cfg.resume_from_checkpoint:
+        print(f"--- Resuming training from checkpoint: {cfg.resume_from_checkpoint} ---")
+        checkpoint = torch.load(cfg.resume_from_checkpoint, map_location=cfg.device)
+
+        model.load_state_dict(checkpoint) 
+        if ema_model:
+            ema_model.module.load_state_dict(checkpoint)
+
+        if cfg.resume_epoch:
+            start_epoch = cfg.resume_epoch
+            print(f"Starting from epoch {start_epoch}")
+        
+        if scheduler:
+            scheduler.last_epoch = start_epoch * len(train_dl)
+            print(f"Scheduler fast-forwarded to step {scheduler.last_epoch}.")
+
     best_score = 0
-    for epoch in range(cfg.epochs):
+    if cfg.resume_from_checkpoint and hasattr(cfg, 'resume_best_score'):
+        best_score = cfg.resume_best_score
+        print(f"Resuming with best_score set to {best_score:.4f}")
+    for epoch in range(start_epoch, cfg.epochs):
         model.train()
         train_losses = []
         

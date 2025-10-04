@@ -15,6 +15,9 @@ cfg.train= True
 cfg.val= True
 cfg.seed= -1
 cfg.fold= 0
+cfg.resume_from_checkpoint = None
+cfg.resume_epoch = None
+cfg.resume_best_score = None
 
 # Optimizer + Scheduler
 cfg.scheduler = "Constant"
