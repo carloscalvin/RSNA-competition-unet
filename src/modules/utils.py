@@ -63,8 +63,6 @@ def flatten_dict(d):
     _flatten("", d, flattened_dict)
     return flattened_dict
 
-
-
 def get_probs_from_heatmap_advanced(heatmap_batch: torch.Tensor, nms_radius: int):
     probs_map = torch.sigmoid(heatmap_batch)
     batch_size, num_channels, _, _, _ = probs_map.shape
@@ -76,8 +74,11 @@ def get_probs_from_heatmap_advanced(heatmap_batch: torch.Tensor, nms_radius: int
             peaks_map = nms_3d(channel_map.unsqueeze(0).unsqueeze(0), nms_radius=nms_radius)
             max_peak_value = torch.max(peaks_map)
             all_location_probs[b, c] = max_peak_value
-            
-    present_prob = torch.max(all_location_probs, dim=1, keepdim=True).values
+
+    no_aneurysm_probs = 1 - all_location_probs
+    prob_no_aneurysm_at_all = torch.prod(no_aneurysm_probs, dim=1, keepdim=True)
+    present_prob = 1 - prob_no_aneurysm_at_all
+
     final_probs = torch.cat([all_location_probs, present_prob], dim=1)
     
     return final_probs
