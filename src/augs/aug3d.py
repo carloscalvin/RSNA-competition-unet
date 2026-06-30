@@ -134,6 +134,49 @@ def coarse_dropout_3d(x, mask= None, p= 0.5, fill_val=0.0, num_holes=(1,3), hole
     else:
         return x
 
+def temporal_flip(imgs, coords, masks, rng, p=0.5):
+    """Consistent random spatial flip across all W frames; updates coordinates."""
+    W, C, Z, Y, X = imgs.shape
+    spatial_sizes = [Z, Y, X]
+    flip_axes = [2, 3, 4]  # tensor dims for Z, Y, X
+
+    for axis_idx, (dim, ax) in enumerate(zip(spatial_sizes, flip_axes)):
+        if rng.random() < p:
+            imgs = imgs.flip(dims=[ax])
+            for t in range(W):
+                if len(coords[t]) > 0:
+                    coords[t] = coords[t].clone()
+                    coords[t][:, axis_idx] = (dim - 1) - coords[t][:, axis_idx]
+
+    return imgs, coords, masks
+
+
+def temporal_brightness(imgs, coords, masks, rng, shift_range=0.1, p=0.5):
+    """Random additive brightness shift on all frames."""
+    if rng.random() < p:
+        shift = float(rng.uniform(-shift_range, shift_range))
+        imgs = (imgs + shift).clamp(0.0, 4.0)
+    return imgs, coords, masks
+
+
+def temporal_coarse_dropout(imgs, coords, masks, rng, p=0.3,
+                             num_holes=(1, 3), hole_range=(4, 16, 16)):
+    """Apply random 3D boxes of zeros to all W frames (same location each frame)."""
+    if rng.random() < p:
+        W, C, Z, Y, X = imgs.shape
+        n_holes = int(rng.integers(num_holes[0], num_holes[1] + 1))
+        for _ in range(n_holes):
+            hz = int(rng.integers(2, max(3, hole_range[0])))
+            hy = int(rng.integers(2, max(3, hole_range[1])))
+            hx = int(rng.integers(2, max(3, hole_range[2])))
+            z0 = int(rng.integers(0, max(1, Z - hz)))
+            y0 = int(rng.integers(0, max(1, Y - hy)))
+            x0 = int(rng.integers(0, max(1, X - hx)))
+            imgs[:, :, z0:z0 + hz, y0:y0 + hy, x0:x0 + hx] = 0.0
+
+    return imgs, coords, masks
+
+
 if __name__ == "__main__":
     x= torch.ones(1,1,32,32,32)
     mask= torch.ones(1,6,32,32,32)
