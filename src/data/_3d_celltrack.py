@@ -13,12 +13,6 @@ import numpy as np
 import torch
 import zarr
 from torch.utils.data import Dataset
-
-# Ensure baseline tracking_cellmot package is importable.
-_baseline_src = Path(__file__).parent.parent.parent / "baseline" / "src"
-if str(_baseline_src) not in sys.path:
-    sys.path.insert(0, str(_baseline_src))
-
 import polars as pl
 from tracking_cellmot.io import open_dataset
 
